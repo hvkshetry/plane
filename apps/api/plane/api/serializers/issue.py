@@ -13,6 +13,7 @@ from rest_framework import serializers
 # Module imports
 from plane.db.models import (
     Issue,
+    IssueCoordinationState,
     IssueType,
     IssueActivity,
     IssueAssignee,
@@ -36,6 +37,26 @@ from .cycle import CycleLiteSerializer, CycleSerializer
 from .module import ModuleLiteSerializer, ModuleSerializer
 from .state import StateLiteSerializer
 from .user import UserLiteSerializer
+
+
+def _serialize_coordination_state(state: IssueCoordinationState | None) -> dict | None:
+    if state is None:
+        return None
+    return {
+        "id": str(state.id),
+        "route_to": state.route_to,
+        "reply_identity": state.reply_identity,
+        "coordination_status": state.coordination_status,
+        "approver_id": str(state.approver_id) if state.approver_id else None,
+        "allowed_responder": state.allowed_responder,
+        "waiting_on": state.waiting_on,
+        "waiting_since": state.waiting_since,
+        "claimed_by_id": str(state.claimed_by_id) if state.claimed_by_id else None,
+        "claim_expires_at": state.claim_expires_at,
+        "last_actor_id": str(state.last_actor_id) if state.last_actor_id else None,
+        "last_transition_at": state.last_transition_at,
+        "metadata": state.metadata or {},
+    }
 
 # Django imports
 from django.core.exceptions import ValidationError
@@ -65,6 +86,7 @@ class IssueSerializer(BaseSerializer):
     type_id = serializers.PrimaryKeyRelatedField(
         source="type", queryset=IssueType.objects.all(), required=False, allow_null=True
     )
+    coordination = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
@@ -316,7 +338,20 @@ class IssueSerializer(BaseSerializer):
                     str(label) for label in IssueLabel.objects.filter(issue=instance).values_list("label_id", flat=True)
                 ]
 
+        if "coordination" in self.fields:
+            data["coordination"] = self.get_coordination(instance)
+
         return data
+
+    def get_coordination(self, instance):
+        if "coordination" not in (self.expand or []):
+            return None
+
+        try:
+            state = instance.coordination_state
+        except IssueCoordinationState.DoesNotExist:
+            state = None
+        return _serialize_coordination_state(state)
 
 
 class IssueLiteSerializer(BaseSerializer):
@@ -426,7 +461,7 @@ class IssueLinkCreateSerializer(BaseSerializer):
     # Validation if url already exists
     def create(self, validated_data):
         if IssueLink.objects.filter(url=validated_data.get("url"), issue_id=validated_data.get("issue_id")).exists():
-            raise serializers.ValidationError({"error": "URL already exists for this Issue"})
+            raise serializers.ValidationError({"error": "URL already exists for this work item"})
         return IssueLink.objects.create(**validated_data)
 
 
@@ -451,7 +486,7 @@ class IssueLinkUpdateSerializer(IssueLinkCreateSerializer):
             .exclude(pk=instance.id)
             .exists()
         ):
-            raise serializers.ValidationError({"error": "URL already exists for this Issue"})
+            raise serializers.ValidationError({"error": "URL already exists for this work item"})
 
         return super().update(instance, validated_data)
 
@@ -638,6 +673,7 @@ class IssueExpandSerializer(BaseSerializer):
     assignees = serializers.SerializerMethodField()
     state = StateLiteSerializer(read_only=True)
     description = serializers.JSONField(source="description_json", read_only=True)
+    coordination = serializers.SerializerMethodField()
 
     def get_labels(self, obj):
         expand = self.context.get("expand", [])
@@ -651,6 +687,16 @@ class IssueExpandSerializer(BaseSerializer):
         if "assignees" in expand:
             return UserLiteSerializer([ia.assignee for ia in obj.issue_assignee.all()], many=True).data
         return [ia.assignee_id for ia in obj.issue_assignee.all()]
+
+    def get_coordination(self, obj):
+        expand = self.context.get("expand", [])
+        if "coordination" not in expand:
+            return None
+        try:
+            state = obj.coordination_state
+        except IssueCoordinationState.DoesNotExist:
+            state = None
+        return _serialize_coordination_state(state)
 
     class Meta:
         model = Issue
@@ -694,9 +740,9 @@ class IssueSearchSerializer(serializers.Serializer):
     project context, and workspace information for search API responses.
     """
 
-    id = serializers.CharField(required=True, help_text="Issue ID")
-    name = serializers.CharField(required=True, help_text="Issue name")
-    sequence_id = serializers.CharField(required=True, help_text="Issue sequence ID")
+    id = serializers.CharField(required=True, help_text="Work item ID")
+    name = serializers.CharField(required=True, help_text="Work item name")
+    sequence_id = serializers.CharField(required=True, help_text="Work item sequence ID")
     project__identifier = serializers.CharField(required=True, help_text="Project identifier")
     project_id = serializers.CharField(required=True, help_text="Project ID")
     workspace__slug = serializers.CharField(required=True, help_text="Workspace slug")

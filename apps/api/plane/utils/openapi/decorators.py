@@ -89,7 +89,7 @@ def cycle_docs(**kwargs):
 
 
 def issue_docs(**kwargs):
-    """Decorator for issue-related endpoints"""
+    """Decorator for work item-related endpoints"""
     defaults = {
         "tags": ["Work Items"],
         "parameters": [WORKSPACE_SLUG_PARAMETER, PROJECT_ID_PARAMETER],
@@ -132,9 +132,9 @@ def asset_docs(**kwargs):
     return extend_schema(**_merge_schema_options(defaults, kwargs))
 
 
-# Issue-related decorators for specific tags
+# Work item-related decorators for specific tags
 def work_item_docs(**kwargs):
-    """Decorator for work item endpoints (main issue operations)"""
+    """Decorator for work item endpoints"""
     defaults = {
         "tags": ["Work Items"],
         "parameters": [WORKSPACE_SLUG_PARAMETER, PROJECT_ID_PARAMETER],
@@ -164,7 +164,7 @@ def label_docs(**kwargs):
 
 
 def issue_link_docs(**kwargs):
-    """Decorator for issue link endpoints"""
+    """Decorator for work item link endpoints"""
     defaults = {
         "tags": ["Work Item Links"],
         "parameters": [WORKSPACE_SLUG_PARAMETER, PROJECT_ID_PARAMETER],
@@ -179,7 +179,7 @@ def issue_link_docs(**kwargs):
 
 
 def issue_comment_docs(**kwargs):
-    """Decorator for issue comment endpoints"""
+    """Decorator for work item comment endpoints"""
     defaults = {
         "tags": ["Work Item Comments"],
         "parameters": [WORKSPACE_SLUG_PARAMETER, PROJECT_ID_PARAMETER],
@@ -194,7 +194,7 @@ def issue_comment_docs(**kwargs):
 
 
 def issue_activity_docs(**kwargs):
-    """Decorator for issue activity/search endpoints"""
+    """Decorator for work item activity/search endpoints"""
     defaults = {
         "tags": ["Work Item Activity"],
         "parameters": [WORKSPACE_SLUG_PARAMETER, PROJECT_ID_PARAMETER],
@@ -209,7 +209,7 @@ def issue_activity_docs(**kwargs):
 
 
 def issue_attachment_docs(**kwargs):
-    """Decorator for issue attachment endpoints"""
+    """Decorator for work item attachment endpoints"""
     defaults = {
         "tags": ["Work Item Attachments"],
         "parameters": [WORKSPACE_SLUG_PARAMETER, PROJECT_ID_PARAMETER],
@@ -239,7 +239,7 @@ def module_docs(**kwargs):
 
 
 def module_issue_docs(**kwargs):
-    """Decorator for module issue management endpoints"""
+    """Decorator for module work item management endpoints"""
     defaults = {
         "tags": ["Modules"],
         "parameters": [WORKSPACE_SLUG_PARAMETER, PROJECT_ID_PARAMETER],

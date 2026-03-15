@@ -31,6 +31,7 @@ from .integration import (
 from .issue import (
     CommentReaction,
     Issue,
+    IssueCoordinationState,
     IssueActivity,
     IssueAssignee,
     IssueBlocker,

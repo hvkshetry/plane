@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth import logout
+from django.db import transaction
 
 # Third party imports
 from rest_framework.response import Response
@@ -27,10 +28,21 @@ from plane.license.api.permissions import InstanceAdminPermission
 from plane.license.api.serializers import (
     InstanceAdminMeSerializer,
     InstanceAdminSerializer,
+    ProvisioningRequestSerializer,
 )
 from plane.license.models import Instance, InstanceAdmin
-from plane.db.models import User, Profile
-from plane.utils.cache import cache_response, invalidate_cache
+from plane.db.models import (
+    APIToken,
+    Profile,
+    Project,
+    ProjectMember,
+    ProjectUserProperty,
+    User,
+    Workspace,
+    WorkspaceMember,
+    WorkspaceMemberInvite,
+)
+from plane.utils.cache import cache_response, invalidate_cache, invalidate_cache_directly
 from plane.authentication.utils.login import user_login
 from plane.authentication.utils.host import base_host, user_ip
 from plane.authentication.adapter.error import (
@@ -84,6 +96,324 @@ class InstanceAdminEndpoint(BaseAPIView):
         instance = Instance.objects.first()
         InstanceAdmin.objects.filter(instance=instance, pk=pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class InstanceAdminProvisionIdentitiesEndpoint(BaseAPIView):
+    permission_classes = [InstanceAdminPermission]
+
+    @staticmethod
+    def _set_optional_field(model, field_name, value, update_fields):
+        if value is None or getattr(model, field_name) == value:
+            return
+        setattr(model, field_name, value)
+        update_fields.append(field_name)
+
+    def _upsert_user(self, identity, actor):
+        email = identity["email"].strip().lower()
+        user = User.objects.filter(email=email).first()
+        created = user is None
+        update_fields = []
+
+        if created:
+            user = User(
+                email=email,
+                username=uuid.uuid4().hex,
+                first_name=identity.get("first_name") or "",
+                last_name=identity.get("last_name") or "",
+                display_name=identity.get("display_name") or "",
+                user_timezone=identity.get("user_timezone") or "UTC",
+                is_active=True,
+                is_managed=True,
+                is_password_autoset=True,
+                is_password_reset_required=True,
+            )
+            user.password = make_password(uuid.uuid4().hex)
+            user.save(created_by_id=actor.id, disable_auto_set_user=True)
+            Profile.objects.get_or_create(user=user)
+            return user, "created"
+
+        if not user.is_active:
+            user.is_active = True
+            update_fields.append("is_active")
+        if not user.is_managed:
+            user.is_managed = True
+            update_fields.append("is_managed")
+
+        self._set_optional_field(user, "first_name", identity.get("first_name"), update_fields)
+        self._set_optional_field(user, "last_name", identity.get("last_name"), update_fields)
+        self._set_optional_field(user, "display_name", identity.get("display_name"), update_fields)
+        self._set_optional_field(user, "user_timezone", identity.get("user_timezone"), update_fields)
+
+        if update_fields:
+            if hasattr(user, "updated_at"):
+                update_fields.append("updated_at")
+            user.save(update_fields=list(dict.fromkeys(update_fields)))
+
+        Profile.objects.get_or_create(user=user)
+        return user, "updated" if update_fields else "existing"
+
+    def _upsert_instance_admin(self, user):
+        instance = Instance.objects.first()
+        instance_admin, created = InstanceAdmin.objects.get_or_create(
+            instance=instance,
+            user=user,
+            defaults={"role": 20},
+        )
+        updated = False
+        if not created and instance_admin.role != 20:
+            instance_admin.role = 20
+            instance_admin.save(update_fields=["role", "updated_at"] if hasattr(instance_admin, "updated_at") else ["role"])
+            updated = True
+        return {
+            "id": str(instance_admin.id),
+            "status": "created" if created else "updated" if updated else "existing",
+            "role": instance_admin.role,
+        }
+
+    def _purge_inactive_workspace_membership(self, workspace, user):
+        WorkspaceMember.all_objects.filter(workspace=workspace, member=user).exclude(
+            is_active=True,
+            deleted_at__isnull=True,
+        ).delete(soft=False)
+        WorkspaceMemberInvite.all_objects.filter(workspace=workspace, email=user.email).delete(soft=False)
+
+    def _purge_inactive_project_membership(self, project, user):
+        purged_memberships = ProjectMember.all_objects.filter(project=project, member=user).exclude(
+            is_active=True,
+            deleted_at__isnull=True,
+        )
+        if purged_memberships.exists():
+            purged_memberships.delete(soft=False)
+            ProjectUserProperty.all_objects.filter(project=project, user=user).delete(soft=False)
+
+    def _upsert_workspace_member(self, user, membership, strategy="reactivate", sync_role=True):
+        workspace = Workspace.objects.get(slug=membership["slug"])
+        active_workspace_member = WorkspaceMember.objects.filter(workspace=workspace, member=user).first()
+        if active_workspace_member is not None:
+            workspace_member = active_workspace_member
+            previous_state = {
+                "role": workspace_member.role,
+            }
+            update_fields = []
+            if sync_role and workspace_member.role != membership["role"]:
+                workspace_member.role = membership["role"]
+                update_fields.append("role")
+            if update_fields:
+                if hasattr(workspace_member, "updated_at"):
+                    update_fields.append("updated_at")
+                workspace_member.save(update_fields=list(dict.fromkeys(update_fields)))
+            status_label = "updated" if sync_role and previous_state["role"] != membership["role"] else "existing"
+        else:
+            workspace_member = WorkspaceMember.all_objects.filter(workspace=workspace, member=user).first()
+            previous_state = None
+
+        if active_workspace_member is None and workspace_member is None:
+            workspace_member = WorkspaceMember.objects.create(
+                workspace=workspace,
+                member=user,
+                role=membership["role"],
+            )
+            status_label = "created"
+        elif active_workspace_member is None and strategy == "purge":
+            self._purge_inactive_workspace_membership(workspace, user)
+            workspace_member = WorkspaceMember.objects.create(
+                workspace=workspace,
+                member=user,
+                role=membership["role"],
+            )
+            status_label = "recreated"
+        elif active_workspace_member is None:
+            previous_state = {
+                "deleted": workspace_member.deleted_at is not None,
+                "inactive": workspace_member.is_active is False,
+                "role": workspace_member.role,
+            }
+            update_fields = []
+            if workspace_member.deleted_at is not None:
+                workspace_member.deleted_at = None
+                update_fields.append("deleted_at")
+            if workspace_member.is_active is False:
+                workspace_member.is_active = True
+                update_fields.append("is_active")
+            if sync_role and workspace_member.role != membership["role"]:
+                workspace_member.role = membership["role"]
+                update_fields.append("role")
+            if update_fields:
+                if hasattr(workspace_member, "updated_at"):
+                    update_fields.append("updated_at")
+                workspace_member.save(update_fields=list(dict.fromkeys(update_fields)))
+            status_label = (
+                "reactivated"
+                if previous_state["deleted"] or previous_state["inactive"]
+                else "updated"
+                if sync_role and previous_state["role"] != membership["role"]
+                else "existing"
+            )
+
+        WorkspaceMemberInvite.all_objects.filter(workspace=workspace, email=user.email).delete(soft=False)
+        return {
+            "id": str(workspace_member.id),
+            "workspace_id": str(workspace.id),
+            "workspace_slug": workspace.slug,
+            "role": workspace_member.role,
+            "status": status_label,
+        }
+
+    def _upsert_project_member(self, user, membership, strategy="reactivate"):
+        project = Project.objects.get(pk=membership["project_id"])
+        # Ensure the user is an active workspace member before granting project access.
+        existing_workspace_member = WorkspaceMember.all_objects.filter(workspace=project.workspace, member=user).first()
+        should_sync_workspace_role = (
+            existing_workspace_member is None
+            or existing_workspace_member.deleted_at is not None
+            or existing_workspace_member.is_active is False
+            or existing_workspace_member.role < membership["role"]
+        )
+        self._upsert_workspace_member(
+            user,
+            {
+                "slug": project.workspace.slug,
+                "role": membership["role"],
+            },
+            strategy=strategy,
+            sync_role=should_sync_workspace_role,
+        )
+
+        active_project_member = ProjectMember.objects.filter(project=project, member=user).first()
+        if active_project_member is not None:
+            project_member = active_project_member
+            was_inactive = False
+            was_deleted = False
+            role_changed = project_member.role != membership["role"]
+            update_fields = []
+            if role_changed:
+                project_member.role = membership["role"]
+                update_fields.append("role")
+            if update_fields:
+                if hasattr(project_member, "updated_at"):
+                    update_fields.append("updated_at")
+                project_member.save(update_fields=list(dict.fromkeys(update_fields)))
+            status_label = "updated" if role_changed else "existing"
+        else:
+            project_member = ProjectMember.all_objects.filter(project=project, member=user).first()
+
+        if active_project_member is None and project_member is None:
+            project_member = ProjectMember.objects.create(
+                project=project,
+                workspace=project.workspace,
+                member=user,
+                role=membership["role"],
+            )
+            status_label = "created"
+        elif active_project_member is None and strategy == "purge":
+            self._purge_inactive_project_membership(project, user)
+            project_member = ProjectMember.objects.create(
+                project=project,
+                workspace=project.workspace,
+                member=user,
+                role=membership["role"],
+            )
+            status_label = "recreated"
+        elif active_project_member is None:
+            was_inactive = project_member.is_active is False
+            was_deleted = project_member.deleted_at is not None
+            role_changed = project_member.role != membership["role"]
+            update_fields = []
+            if project_member.deleted_at is not None:
+                project_member.deleted_at = None
+                update_fields.append("deleted_at")
+            if project_member.is_active is False:
+                project_member.is_active = True
+                update_fields.append("is_active")
+            if role_changed:
+                project_member.role = membership["role"]
+                update_fields.append("role")
+            if update_fields:
+                if hasattr(project_member, "updated_at"):
+                    update_fields.append("updated_at")
+                project_member.save(update_fields=list(dict.fromkeys(update_fields)))
+            status_label = "reactivated" if was_inactive or was_deleted else "updated" if role_changed else "existing"
+
+        return {
+            "id": str(project_member.id),
+            "project_id": str(project.id),
+            "workspace_slug": project.workspace.slug,
+            "role": project_member.role,
+            "status": status_label,
+        }
+
+    def _mint_api_token(self, user, identity):
+        label = identity.get("api_token_label") or f"{user.display_name or user.email} API Token"
+        description = identity.get("api_token_description") or "Provisioned by instance admin"
+        api_token = APIToken.objects.create(
+            label=label,
+            description=description,
+            user=user,
+            user_type=1 if user.is_bot else 0,
+            expired_at=identity.get("expired_at"),
+        )
+        return {
+            "id": str(api_token.id),
+            "label": api_token.label,
+            "token": api_token.token,
+            "expired_at": api_token.expired_at,
+        }
+
+    def post(self, request):
+        serializer = ProvisioningRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        results = []
+        touched_workspaces = set()
+
+        for identity in serializer.validated_data["users"]:
+            with transaction.atomic():
+                user, user_status = self._upsert_user(identity, request.user)
+                result = {
+                    "email": user.email,
+                    "user_id": str(user.id),
+                    "user_status": user_status,
+                    "workspace_memberships": [],
+                    "project_memberships": [],
+                    "api_token": None,
+                    "instance_admin": None,
+                }
+
+                if identity.get("is_instance_admin"):
+                    result["instance_admin"] = self._upsert_instance_admin(user)
+
+                membership_strategy = identity.get("inactive_membership_strategy", "reactivate")
+                for membership in identity.get("workspace_memberships", []):
+                    membership_result = self._upsert_workspace_member(
+                        user,
+                        membership,
+                        strategy=membership_strategy,
+                    )
+                    result["workspace_memberships"].append(membership_result)
+                    touched_workspaces.add(membership_result["workspace_slug"])
+
+                for membership in identity.get("project_memberships", []):
+                    membership_result = self._upsert_project_member(
+                        user,
+                        membership,
+                        strategy=membership_strategy,
+                    )
+                    result["project_memberships"].append(membership_result)
+                    touched_workspaces.add(membership_result["workspace_slug"])
+
+                if identity.get("create_api_token", True):
+                    result["api_token"] = self._mint_api_token(user, identity)
+
+                results.append(result)
+
+        for workspace_slug in touched_workspaces:
+            invalidate_cache_directly(
+                path=f"/api/workspaces/{workspace_slug}/members/",
+                user=False,
+                multiple=True,
+            )
+
+        return Response({"results": results}, status=status.HTTP_200_OK)
 
 
 class InstanceAdminSignUpEndpoint(View):

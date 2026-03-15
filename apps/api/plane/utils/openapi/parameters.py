@@ -76,15 +76,15 @@ PROJECT_IDENTIFIER_PARAMETER = OpenApiParameter(
 
 ISSUE_IDENTIFIER_PARAMETER = OpenApiParameter(
     name="issue_identifier",
-    description="Issue sequence ID (numeric identifier within project)",
+    description="Work item sequence ID (numeric identifier within project)",
     required=True,
     type=OpenApiTypes.INT,
     location=OpenApiParameter.PATH,
     examples=[
         OpenApiExample(
-            name="Example issue identifier",
+            name="Example work item identifier",
             value=123,
-            description="A typical issue sequence ID",
+            description="A typical work item sequence ID",
         )
     ],
 )
@@ -151,15 +151,15 @@ MODULE_PK_PARAMETER = OpenApiParameter(
 
 ISSUE_ID_PARAMETER = OpenApiParameter(
     name="issue_id",
-    description="Issue ID",
+    description="Work item ID",
     required=True,
     type=OpenApiTypes.UUID,
     location=OpenApiParameter.PATH,
     examples=[
         OpenApiExample(
-            name="Example issue ID",
+            name="Example work item ID",
             value="550e8400-e29b-41d4-a716-446655440000",
-            description="A typical issue UUID",
+            description="A typical work item UUID",
         )
     ],
 )
@@ -292,9 +292,9 @@ EXTERNAL_ID_PARAMETER = OpenApiParameter(
     required=False,
     examples=[
         OpenApiExample(
-            name="GitHub Issue",
+            name="GitHub Work Item",
             value="1234567890",
-            description="GitHub issue number",
+            description="GitHub work item or issue number",
         )
     ],
 )

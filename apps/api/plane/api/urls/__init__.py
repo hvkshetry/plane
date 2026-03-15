@@ -14,17 +14,23 @@ from .user import urlpatterns as user_patterns
 from .work_item import urlpatterns as work_item_patterns
 from .invite import urlpatterns as invite_patterns
 from .sticky import urlpatterns as sticky_patterns
+from .page import urlpatterns as page_patterns
+from .views import urlpatterns as view_patterns
+from .estimate import urlpatterns as estimate_patterns
 
 urlpatterns = [
     *asset_patterns,
     *cycle_patterns,
+    *estimate_patterns,
     *intake_patterns,
     *label_patterns,
     *member_patterns,
     *module_patterns,
+    *page_patterns,
     *project_patterns,
     *state_patterns,
     *user_patterns,
+    *view_patterns,
     *work_item_patterns,
     *invite_patterns,
     *sticky_patterns,

@@ -62,3 +62,19 @@ from .user import UserEndpoint
 from .invite import WorkspaceInvitationsViewset
 
 from .sticky import StickyViewSet
+
+from .page import PageAPIEndpoint
+
+from .view import ProjectViewAPIEndpoint
+
+from .estimate import (
+    ProjectEstimateAPIEndpoint,
+    EstimatePointListCreateAPIEndpoint,
+    EstimatePointDetailAPIEndpoint,
+)
+
+from .relation import IssueRelationAPIEndpoint
+from .coordination import (
+    IssueCoordinationStateAPIEndpoint,
+    IssueCoordinationActionAPIEndpoint,
+)

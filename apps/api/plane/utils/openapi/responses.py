@@ -198,13 +198,13 @@ PROJECT_NAME_TAKEN_RESPONSE = OpenApiResponse(
     ],
 )
 
-# Issue-specific Responses
+# Work item-specific Responses
 ISSUE_NOT_FOUND_RESPONSE = OpenApiResponse(
-    description="Issue not found",
+    description="Work item not found",
     examples=[
         OpenApiExample(
-            name="Issue Not Found",
-            value={"error": "Issue not found"},
+            name="Work Item Not Found",
+            value={"error": "Work item not found"},
         )
     ],
 )
@@ -265,11 +265,11 @@ MODULE_NOT_FOUND_RESPONSE = OpenApiResponse(
 )
 
 MODULE_ISSUE_NOT_FOUND_RESPONSE = OpenApiResponse(
-    description="Module issue not found",
+    description="Module work item not found",
     examples=[
         OpenApiExample(
-            name="Module Issue Not Found",
-            value={"error": "Module issue not found"},
+            name="Module Work Item Not Found",
+            value={"error": "Module work item not found"},
         )
     ],
 )
@@ -303,7 +303,7 @@ STATE_CANNOT_DELETE_RESPONSE = OpenApiResponse(
             name="State Cannot Delete",
             value={
                 "error": "State cannot be deleted",
-                "reason": "Default state or has issues",
+                "reason": "Default state or has work items",
             },
         )
     ],

@@ -14,6 +14,7 @@ from .configuration import (
 
 from .admin import (
     InstanceAdminEndpoint,
+    InstanceAdminProvisionIdentitiesEndpoint,
     InstanceAdminSignInEndpoint,
     InstanceAdminSignUpEndpoint,
     InstanceAdminUserMeEndpoint,

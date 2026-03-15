@@ -164,7 +164,7 @@ def user_has_issue_permission(user_id, project_id, issue=None, allowed_roles=Non
 
 class WorkspaceIssueAPIEndpoint(BaseAPIView):
     """
-    This viewset provides `retrieveByIssueId` on workspace level
+    This viewset provides `retrieveByWorkItemId` on workspace level
 
     """
 
@@ -192,6 +192,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
             .select_related("workspace")
             .select_related("state")
             .select_related("parent")
+            .select_related("coordination_state")
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
@@ -200,7 +201,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
     @extend_schema(
         operation_id="get_workspace_work_item",
         summary="Retrieve work item by identifiers",
-        description="Retrieve a specific work item using workspace slug, project identifier, and issue identifier.",
+        description="Retrieve a specific work item using workspace slug, project identifier, and work item identifier.",
         tags=["Work Items"],
         parameters=[
             WORKSPACE_SLUG_PARAMETER,
@@ -219,7 +220,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
     def get(self, request, slug, project_identifier=None, issue_identifier=None):
         """Retrieve work item by identifiers
 
-        Retrieve a specific work item using workspace slug, project identifier, and issue identifier.
+        Retrieve a specific work item using workspace slug, project identifier, and work item identifier.
         This endpoint provides workspace-level access to work items.
         """
         if issue_identifier and project_identifier:
@@ -241,7 +242,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
 
 class IssueListCreateAPIEndpoint(BaseAPIView):
     """
-    This viewset provides `list` and `create` on issue level
+    This viewset provides `list` and `create` on work item level
     """
 
     model = Issue
@@ -264,6 +265,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             .select_related("workspace")
             .select_related("state")
             .select_related("parent")
+            .select_related("coordination_state")
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
@@ -346,6 +348,48 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         )
 
         total_issue_queryset = Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug)
+
+        parent = request.GET.get("parent")
+        updated_after = request.GET.get("updated_at__gt")
+        assignee_id = request.GET.get("assignee")
+        state_id = request.GET.get("state")
+        route_to = request.GET.get("route_to")
+        coordination_status = request.GET.get("coordination_status")
+        approver_id = request.GET.get("approver_id")
+        claimed_by_id = request.GET.get("claimed_by_id")
+        waiting_on = request.GET.get("waiting_on")
+
+        if parent:
+            issue_queryset = issue_queryset.filter(parent_id=parent)
+            total_issue_queryset = total_issue_queryset.filter(parent_id=parent)
+        if updated_after:
+            issue_queryset = issue_queryset.filter(updated_at__gt=updated_after)
+            total_issue_queryset = total_issue_queryset.filter(updated_at__gt=updated_after)
+        if assignee_id:
+            issue_queryset = issue_queryset.filter(assignees__id=assignee_id)
+            total_issue_queryset = total_issue_queryset.filter(assignees__id=assignee_id)
+        if state_id:
+            issue_queryset = issue_queryset.filter(state_id=state_id)
+            total_issue_queryset = total_issue_queryset.filter(state_id=state_id)
+        if route_to:
+            issue_queryset = issue_queryset.filter(coordination_state__route_to=route_to)
+            total_issue_queryset = total_issue_queryset.filter(coordination_state__route_to=route_to)
+        if coordination_status:
+            issue_queryset = issue_queryset.filter(
+                coordination_state__coordination_status=coordination_status
+            )
+            total_issue_queryset = total_issue_queryset.filter(
+                coordination_state__coordination_status=coordination_status
+            )
+        if approver_id:
+            issue_queryset = issue_queryset.filter(coordination_state__approver_id=approver_id)
+            total_issue_queryset = total_issue_queryset.filter(coordination_state__approver_id=approver_id)
+        if claimed_by_id:
+            issue_queryset = issue_queryset.filter(coordination_state__claimed_by_id=claimed_by_id)
+            total_issue_queryset = total_issue_queryset.filter(coordination_state__claimed_by_id=claimed_by_id)
+        if waiting_on:
+            issue_queryset = issue_queryset.filter(coordination_state__waiting_on=waiting_on)
+            total_issue_queryset = total_issue_queryset.filter(coordination_state__waiting_on=waiting_on)
 
         # Priority Ordering
         if order_by_param == "priority" or order_by_param == "-priority":
@@ -447,7 +491,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
                 ).first()
                 return Response(
                     {
-                        "error": "Issue with the same external id and external source already exists",
+                        "error": "Work item with the same external id and external source already exists",
                         "id": str(issue.id),
                     },
                     status=status.HTTP_409_CONFLICT,
@@ -486,7 +530,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
 
 
 class IssueDetailAPIEndpoint(BaseAPIView):
-    """Issue Detail Endpoint"""
+    """Work Item Detail Endpoint"""
 
     model = Issue
     webhook_event = "issue"
@@ -508,6 +552,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             .select_related("workspace")
             .select_related("state")
             .select_related("parent")
+            .select_related("coordination_state")
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
@@ -527,7 +572,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         ],
         responses={
             200: OpenApiResponse(
-                description="List of issues or issue details",
+                description="Work item details",
                 response=IssueSerializer,
                 examples=[ISSUE_EXAMPLE],
             ),
@@ -736,7 +781,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             ):
                 return Response(
                     {
-                        "error": "Issue with the same external id and external source already exists",
+                        "error": "Work item with the same external id and external source already exists",
                         "id": str(issue.id),
                     },
                     status=status.HTTP_409_CONFLICT,
@@ -1142,7 +1187,7 @@ class IssueLinkListCreateAPIEndpoint(BaseAPIView):
 
 
 class IssueLinkDetailAPIEndpoint(BaseAPIView):
-    """Issue Link Detail Endpoint"""
+    """Work Item Link Detail Endpoint"""
 
     permission_classes = [ProjectEntityPermission]
 
@@ -1178,11 +1223,11 @@ class IssueLinkDetailAPIEndpoint(BaseAPIView):
         responses={
             200: create_paginated_response(
                 IssueLinkSerializer,
-                "PaginatedIssueLinkDetailResponse",
+                "PaginatedWorkItemLinkDetailResponse",
                 "Work item link details or paginated list",
                 "Work Item Link Details",
             ),
-            404: OpenApiResponse(description="Issue not found"),
+            404: OpenApiResponse(description="Work item not found"),
         },
     )
     def get(self, request, slug, project_id, issue_id, pk):
@@ -1206,7 +1251,7 @@ class IssueLinkDetailAPIEndpoint(BaseAPIView):
 
     @issue_link_docs(
         operation_id="update_issue_link",
-        description="Modify the URL, title, or metadata of an existing issue link.",
+        description="Modify the URL, title, or metadata of an existing work item link.",
         parameters=[
             ISSUE_ID_PARAMETER,
             LINK_ID_PARAMETER,
@@ -1217,7 +1262,7 @@ class IssueLinkDetailAPIEndpoint(BaseAPIView):
         ),
         responses={
             200: OpenApiResponse(
-                description="Issue link updated successfully",
+                description="Work item link updated successfully",
                 response=IssueLinkSerializer,
                 examples=[ISSUE_LINK_EXAMPLE],
             ),
@@ -1226,10 +1271,10 @@ class IssueLinkDetailAPIEndpoint(BaseAPIView):
         },
     )
     def patch(self, request, slug, project_id, issue_id, pk):
-        """Update issue link
+        """Update work item link
 
-        Modify the URL, title, or metadata of an existing issue link.
-        Tracks all changes in issue activity logs.
+        Modify the URL, title, or metadata of an existing work item link.
+        Tracks all changes in work item activity logs.
         """
         issue_link = IssueLink.objects.get(workspace__slug=slug, project_id=project_id, issue_id=issue_id, pk=pk)
         requested_data = json.dumps(request.data, cls=DjangoJSONEncoder)
@@ -1285,7 +1330,7 @@ class IssueLinkDetailAPIEndpoint(BaseAPIView):
 
 
 class IssueCommentListCreateAPIEndpoint(BaseAPIView):
-    """Issue Comment List and Create Endpoint"""
+    """Work Item Comment List and Create Endpoint"""
 
     serializer_class = IssueCommentSerializer
     model = IssueComment
@@ -1332,11 +1377,11 @@ class IssueCommentListCreateAPIEndpoint(BaseAPIView):
         responses={
             200: create_paginated_response(
                 IssueCommentSerializer,
-                "PaginatedIssueCommentResponse",
+                "PaginatedWorkItemCommentResponse",
                 "Paginated list of work item comments",
                 "Paginated Work Item Comments",
             ),
-            404: OpenApiResponse(description="Issue not found"),
+            404: OpenApiResponse(description="Work item not found"),
         },
     )
     def get(self, request, slug, project_id, issue_id):
@@ -1492,7 +1537,7 @@ class IssueCommentDetailAPIEndpoint(BaseAPIView):
         },
     )
     def get(self, request, slug, project_id, issue_id, pk):
-        """Retrieve issue comment
+        """Retrieve work item comment
 
         Retrieve details of a specific comment.
         """
@@ -1592,7 +1637,7 @@ class IssueCommentDetailAPIEndpoint(BaseAPIView):
         },
     )
     def delete(self, request, slug, project_id, issue_id, pk):
-        """Delete issue comment
+        """Delete work item comment
 
         Permanently remove a comment from a work item.
         Records deletion activity for audit purposes.
@@ -1630,18 +1675,18 @@ class IssueActivityListAPIEndpoint(BaseAPIView):
         responses={
             200: create_paginated_response(
                 IssueActivitySerializer,
-                "PaginatedIssueActivityResponse",
-                "Paginated list of issue activities",
-                "Paginated Issue Activities",
+                "PaginatedWorkItemActivityResponse",
+                "Paginated list of work item activities",
+                "Paginated Work Item Activities",
             ),
             400: INVALID_REQUEST_RESPONSE,
             404: ISSUE_NOT_FOUND_RESPONSE,
         },
     )
     def get(self, request, slug, project_id, issue_id):
-        """List issue activities
+        """List work item activities
 
-        Retrieve chronological activity logs for an issue.
+        Retrieve chronological activity logs for a work item.
         Excludes comment, vote, reaction, and draft activities.
         """
         issue_activities = (
@@ -1665,7 +1710,7 @@ class IssueActivityListAPIEndpoint(BaseAPIView):
 
 
 class IssueActivityDetailAPIEndpoint(BaseAPIView):
-    """Issue Activity Detail Endpoint"""
+    """Work Item Activity Detail Endpoint"""
 
     permission_classes = [ProjectEntityPermission]
     use_read_replica = True
@@ -1685,7 +1730,7 @@ class IssueActivityDetailAPIEndpoint(BaseAPIView):
         responses={
             200: create_paginated_response(
                 IssueActivitySerializer,
-                "PaginatedIssueActivityDetailResponse",
+                "PaginatedWorkItemActivityDetailResponse",
                 "Paginated list of work item activities",
                 "Work Item Activity Details",
             ),
@@ -1694,7 +1739,7 @@ class IssueActivityDetailAPIEndpoint(BaseAPIView):
         },
     )
     def get(self, request, slug, project_id, issue_id, pk):
-        """Retrieve issue activity
+        """Retrieve work item activity
 
         Retrieve details of a specific activity.
         Excludes comment, vote, reaction, and draft activities.
@@ -1724,7 +1769,7 @@ class IssueActivityDetailAPIEndpoint(BaseAPIView):
 
 
 class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
-    """Issue Attachment List and Create Endpoint"""
+    """Work Item Attachment List and Create Endpoint"""
 
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
@@ -1788,14 +1833,14 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
                 ],
             ),
             404: OpenApiResponse(
-                description="Issue or Project or Workspace not found",
+                description="Work item, project, or workspace not found",
                 examples=[
                     OpenApiExample(
                         name="Workspace not found",
                         value={"error": "Workspace not found"},
                     ),
                     OpenApiExample(name="Project not found", value={"error": "Project not found"}),
-                    OpenApiExample(name="Issue not found", value={"error": "Issue not found"}),
+                    OpenApiExample(name="Work item not found", value={"error": "Work item not found"}),
                 ],
             ),
         },
@@ -1869,7 +1914,7 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
             ).first()
             return Response(
                 {
-                    "error": "Issue with the same external id and external source already exists",
+                    "error": "Work item attachment with the same external id and external source already exists",
                     "id": str(asset.id),
                 },
                 status=status.HTTP_409_CONFLICT,
@@ -1921,9 +1966,9 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
         },
     )
     def get(self, request, slug, project_id, issue_id):
-        """List issue attachments
+        """List work item attachments
 
-        List all attachments for an issue.
+        List all attachments for a work item.
         """
         # Get all the attachments
         issue_attachments = FileAsset.objects.filter(
@@ -1939,7 +1984,7 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
 
 
 class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
-    """Issue Attachment Detail Endpoint"""
+    """Work Item Attachment Detail Endpoint"""
 
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
@@ -2143,14 +2188,14 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
 
 
 class IssueSearchEndpoint(BaseAPIView):
-    """Endpoint to search across multiple fields in the issues"""
+    """Endpoint to search across multiple fields in work items"""
 
     use_read_replica = True
 
     @extend_schema(
         operation_id="search_work_items",
         tags=["Work Items"],
-        description="Perform semantic search across issue names, sequence IDs, and project identifiers.",
+        description="Perform semantic search across work item names, sequence IDs, and project identifiers.",
         parameters=[
             WORKSPACE_SLUG_PARAMETER,
             SEARCH_PARAMETER_REQUIRED,

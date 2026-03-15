@@ -9,6 +9,8 @@ from pytest_django.fixtures import django_db_setup
 from plane.db.models import User, Workspace, WorkspaceMember
 from plane.db.models.api import APIToken
 
+pytest_plugins = ["plane.tests.conftest_external"]
+
 
 @pytest.fixture(scope="session")
 def django_db_setup(django_db_setup):  # noqa: F811

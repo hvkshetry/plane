@@ -59,9 +59,9 @@ PROJECT_EXAMPLE = OpenApiExample(
 )
 
 
-# Issue Examples
+# Work Item Examples
 ISSUE_EXAMPLE = OpenApiExample(
-    name="Issue",
+    name="Work Item",
     value={
         "id": "550e8400-e29b-41d4-a716-446655440000",
         "name": "Implement user authentication",
@@ -95,12 +95,12 @@ USER_EXAMPLE = OpenApiExample(
 # REQUEST EXAMPLES - Centralized examples for API requests
 # ============================================================================
 
-# Work Item / Issue Examples
+# Work Item Request Examples
 ISSUE_CREATE_EXAMPLE = OpenApiExample(
-    "IssueCreateSerializer",
+    "WorkItemCreateSerializer",
     value={
-        "name": "New Issue",
-        "description": "New issue description",
+        "name": "New Work Item",
+        "description": "New work item description",
         "priority": "medium",
         "state": "0ec6cfa4-e906-4aad-9390-2df0303a41cd",
         "assignees": ["0ec6cfa4-e906-4aad-9390-2df0303a41cd"],
@@ -112,10 +112,10 @@ ISSUE_CREATE_EXAMPLE = OpenApiExample(
 )
 
 ISSUE_UPDATE_EXAMPLE = OpenApiExample(
-    "IssueUpdateSerializer",
+    "WorkItemUpdateSerializer",
     value={
-        "name": "Updated Issue",
-        "description": "Updated issue description",
+        "name": "Updated Work Item",
+        "description": "Updated work item description",
         "priority": "medium",
         "state": "0ec6cfa4-e906-4aad-9390-2df0303a41cd",
         "assignees": ["0ec6cfa4-e906-4aad-9390-2df0303a41cd"],
@@ -125,10 +125,10 @@ ISSUE_UPDATE_EXAMPLE = OpenApiExample(
 )
 
 ISSUE_UPSERT_EXAMPLE = OpenApiExample(
-    "IssueUpsertSerializer",
+    "WorkItemUpsertSerializer",
     value={
-        "name": "Updated Issue via External ID",
-        "description": "Updated issue description",
+        "name": "Updated Work Item via External ID",
+        "description": "Updated work item description",
         "priority": "high",
         "state": "0ec6cfa4-e906-4aad-9390-2df0303a41cd",
         "assignees": ["0ec6cfa4-e906-4aad-9390-2df0303a41cd"],
@@ -164,49 +164,49 @@ LABEL_UPDATE_EXAMPLE = OpenApiExample(
     description="Example request for updating a label",
 )
 
-# Issue Link Examples
+# Work Item Link Examples
 ISSUE_LINK_CREATE_EXAMPLE = OpenApiExample(
-    "IssueLinkCreateSerializer",
+    "WorkItemLinkCreateSerializer",
     value={
         "url": "https://example.com",
         "title": "Example Link",
     },
-    description="Example request for creating an issue link",
+    description="Example request for creating a work item link",
 )
 
 ISSUE_LINK_UPDATE_EXAMPLE = OpenApiExample(
-    "IssueLinkUpdateSerializer",
+    "WorkItemLinkUpdateSerializer",
     value={
         "url": "https://example.com",
         "title": "Updated Link",
     },
-    description="Example request for updating an issue link",
+    description="Example request for updating a work item link",
 )
 
-# Issue Comment Examples
+# Work Item Comment Examples
 ISSUE_COMMENT_CREATE_EXAMPLE = OpenApiExample(
-    "IssueCommentCreateSerializer",
+    "WorkItemCommentCreateSerializer",
     value={
         "comment_html": "<p>New comment content</p>",
         "external_id": "1234567890",
         "external_source": "github",
     },
-    description="Example request for creating an issue comment",
+    description="Example request for creating a work item comment",
 )
 
 ISSUE_COMMENT_UPDATE_EXAMPLE = OpenApiExample(
-    "IssueCommentCreateSerializer",
+    "WorkItemCommentCreateSerializer",
     value={
         "comment_html": "<p>Updated comment content</p>",
         "external_id": "1234567890",
         "external_source": "github",
     },
-    description="Example request for updating an issue comment",
+    description="Example request for updating a work item comment",
 )
 
-# Issue Attachment Examples
+# Work Item Attachment Examples
 ISSUE_ATTACHMENT_UPLOAD_EXAMPLE = OpenApiExample(
-    "IssueAttachmentUploadSerializer",
+    "WorkItemAttachmentUploadSerializer",
     value={
         "name": "document.pdf",
         "type": "application/pdf",
@@ -214,7 +214,7 @@ ISSUE_ATTACHMENT_UPLOAD_EXAMPLE = OpenApiExample(
         "external_id": "1234567890",
         "external_source": "github",
     },
-    description="Example request for creating an issue attachment",
+    description="Example request for creating a work item attachment",
 )
 
 ATTACHMENT_UPLOAD_CONFIRM_EXAMPLE = OpenApiExample(
@@ -481,9 +481,9 @@ LABEL_EXAMPLE = OpenApiExample(
     },
 )
 
-# Issue Link Response Examples
+# Work Item Link Response Examples
 ISSUE_LINK_EXAMPLE = OpenApiExample(
-    name="IssueLink",
+    name="WorkItemLink",
     value={
         "id": "550e8400-e29b-41d4-a716-446655440000",
         "url": "https://github.com/example/repo/pull/123",
@@ -498,12 +498,12 @@ ISSUE_LINK_EXAMPLE = OpenApiExample(
     },
 )
 
-# Issue Comment Response Examples
+# Work Item Comment Response Examples
 ISSUE_COMMENT_EXAMPLE = OpenApiExample(
-    name="IssueComment",
+    name="WorkItemComment",
     value={
         "id": "550e8400-e29b-41d4-a716-446655440000",
-        "comment_html": "<p>This issue has been resolved by implementing OAuth 2.0 flow.</p>",  # noqa: E501
+        "comment_html": "<p>This work item has been resolved by implementing OAuth 2.0 flow.</p>",  # noqa: E501
         "comment_json": {
             "type": "doc",
             "content": [
@@ -512,7 +512,7 @@ ISSUE_COMMENT_EXAMPLE = OpenApiExample(
                     "content": [
                         {
                             "type": "text",
-                            "text": "This issue has been resolved by implementing OAuth 2.0 flow.",  # noqa: E501
+                            "text": "This work item has been resolved by implementing OAuth 2.0 flow.",  # noqa: E501
                         }
                     ],
                 }
@@ -530,9 +530,9 @@ ISSUE_COMMENT_EXAMPLE = OpenApiExample(
     },
 )
 
-# Issue Attachment Response Examples
+# Work Item Attachment Response Examples
 ISSUE_ATTACHMENT_EXAMPLE = OpenApiExample(
-    name="IssueAttachment",
+    name="WorkItemAttachment",
     value={
         "id": "550e8400-e29b-41d4-a716-446655440000",
         "name": "screenshot.png",
@@ -548,9 +548,9 @@ ISSUE_ATTACHMENT_EXAMPLE = OpenApiExample(
     },
 )
 
-# Issue Attachment Error Response Examples
+# Work Item Attachment Error Response Examples
 ISSUE_ATTACHMENT_NOT_UPLOADED_EXAMPLE = OpenApiExample(
-    name="Issue Attachment Not Uploaded",
+    name="Work Item Attachment Not Uploaded",
     value={
         "error": "The asset is not uploaded.",
         "status": False,
@@ -590,9 +590,9 @@ MODULE_ISSUE_EXAMPLE = OpenApiExample(
     },
 )
 
-# Issue Search Response Examples
+# Work Item Search Response Examples
 ISSUE_SEARCH_EXAMPLE = OpenApiExample(
-    name="IssueSearchResults",
+    name="WorkItemSearchResults",
     value={
         "issues": [
             {
@@ -746,7 +746,7 @@ SAMPLE_STATE = {
 
 SAMPLE_COMMENT = {
     "id": "550e8400-e29b-41d4-a716-446655440000",
-    "comment_html": "<p>This issue needs more investigation. I'll look into the database connection timeout.</p>",  # noqa: E501
+    "comment_html": "<p>This work item needs more investigation. I'll look into the database connection timeout.</p>",  # noqa: E501
     "created_at": "2024-01-15T14:20:00Z",
     "actor": {"id": "550e8400-e29b-41d4-a716-446655440002", "display_name": "John Doe"},
 }
@@ -824,7 +824,7 @@ def get_sample_for_schema(schema_name):
     Get appropriate sample data for a schema type.
 
     Args:
-        schema_name (str): Name of the schema (e.g., "PaginatedIssueResponse")
+        schema_name (str): Name of the schema (e.g., "PaginatedWorkItemResponse")
 
     Returns:
         dict: Sample data for the schema type

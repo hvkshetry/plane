@@ -246,6 +246,57 @@ class Issue(ProjectBaseModel):
         return f"{self.name} <{self.project.name}>"
 
 
+class IssueCoordinationState(ProjectBaseModel):
+    """First-class collaboration state for agent and human handoffs."""
+
+    issue = models.OneToOneField(
+        Issue,
+        on_delete=models.CASCADE,
+        related_name="coordination_state",
+    )
+    route_to = models.TextField(null=True, blank=True)
+    reply_identity = models.TextField(null=True, blank=True)
+    coordination_status = models.CharField(max_length=100, default="new")
+    approver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="issue_coordination_approvals",
+    )
+    allowed_responder = models.TextField(null=True, blank=True)
+    waiting_on = models.TextField(null=True, blank=True)
+    waiting_since = models.DateTimeField(null=True, blank=True)
+    claimed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="issue_coordination_claims",
+    )
+    claim_expires_at = models.DateTimeField(null=True, blank=True)
+    last_actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="issue_coordination_actions",
+    )
+    last_transition_at = models.DateTimeField(default=timezone.now)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "Issue Coordination State"
+        verbose_name_plural = "Issue Coordination States"
+        db_table = "issue_coordination_states"
+        ordering = ("-updated_at",)
+
+    def save(self, *args, **kwargs):
+        self.project = self.issue.project
+        self.workspace = self.issue.workspace
+        super().save(*args, **kwargs)
+
+
 class IssueBlocker(ProjectBaseModel):
     block = models.ForeignKey(Issue, related_name="blocker_issues", on_delete=models.CASCADE)
     blocked_by = models.ForeignKey(Issue, related_name="blocked_issues", on_delete=models.CASCADE)

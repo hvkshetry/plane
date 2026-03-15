@@ -179,7 +179,11 @@ def get_model_data(event: str, event_id: Union[str, List[str]], many: bool = Fal
                 issue_id = queryset.id
                 queryset = model.objects.filter(pk=issue_id).prefetch_related(*issue_prefetches).first()
 
-            return serializer(queryset, many=many, context={"expand": ["labels", "assignees"]}).data
+            return serializer(
+                queryset,
+                many=many,
+                context={"expand": ["labels", "assignees", "coordination"]},
+            ).data
         else:
             return serializer(queryset, many=many).data
     except ObjectDoesNotExist:
