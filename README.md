@@ -69,6 +69,21 @@ Getting started with Plane is simple. Choose the setup that works best for you:
 
 See [CONTRIBUTING](./CONTRIBUTING.md)
 
+## StewardOS fork notes
+
+This fork adds the external API and coordination primitives needed to use Plane as a shared job board for StewardOS agents and human collaborators.
+
+- Adds PAT-authenticated `/api/v1` coverage for pages, views, estimates, and work item relations
+- Adds first-class `IssueCoordinationState` plus coordination actions for claim, handoff, release, approval, rejection, and reply recording
+- Adds instance-admin provisioning endpoints for managed users, memberships, and per-user API tokens
+- Keeps coordination on `/api/v1` instead of falling back to browser-session `/api/...` routes
+
+Why this shape:
+
+- StewardOS needs shared, queryable coordination state instead of routing work through labels, comments, or worker-local memory
+- The design follows the same core lesson highlighted by `llmenron`: shared board state and explicit actor identity outperform hidden scratchpads and inferred ownership
+- The public surface uses `work-items`; Plane's internal `Issue` model is left intact to keep rebases on upstream releases tractable
+
 ## ⚙️ Built with
 
 [![React Router](https://img.shields.io/badge/-React%20Router-CA4245?logo=react-router&style=for-the-badge&logoColor=white)](https://reactrouter.com/)
